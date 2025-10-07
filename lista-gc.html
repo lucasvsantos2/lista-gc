@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Gerador de Lista - GC</title>
+<meta name="color-scheme" content="light dark">
+<style>
+  /* ----- Design System ----- */
+  :root{
+    --bg:#ffffff; --fg:#0f172a; --muted:#64748b; --card:#f8fafc; --border:#e2e8f0;
+    --primary:#111827; --primary-fg:#ffffff; --accent:#2563eb; --accent-weak:#e0e7ff;
+    --success:#16a34a; --radius:14px; --shadow:0 6px 24px rgba(2,6,23,.08);
+    --font-size: clamp(15px, 1.45vw, 17px); --mono: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0b1220; --fg:#e6eaf2; --muted:#9aa7bd; --card:#0f172a; --border:#1f2a44;
+      --primary:#e5e7eb; --primary-fg:#111827; --accent:#60a5fa; --accent-weak:#0b254b;
+      --shadow:0 8px 28px rgba(0,0,0,.35);
+    }
+  }
+
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-size:var(--font-size);line-height:1.45;}
+  *{box-sizing:border-box}
+  .container{max-width:1100px;margin:24px auto;padding:0 18px;}
+
+  .header{
+    background: linear-gradient(135deg, var(--accent-weak), transparent 60%);
+    border:1px solid var(--border); border-radius:var(--radius); padding:18px; margin-bottom:18px; box-shadow:var(--shadow);
+  }
+  .title{display:flex;align-items:center;gap:10px;margin:0 0 6px 0;font-weight:800;letter-spacing:.2px;font-size:clamp(18px,2.6vw,26px);}
+  .subtitle{color:var(--muted);margin:0;font-size:clamp(13px,1.3vw,15px);}
+
+  .grid{display:grid;gap:16px;grid-template-columns:1fr;}
+  @media(min-width:900px){ .grid{grid-template-columns:1fr 1fr;} }
+
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;}
+  .card h2{margin:0 0 10px 0;font-size:clamp(16px,2.1vw,20px);}
+  .row{display:grid;gap:8px;margin-bottom:12px;}
+  label{color:var(--muted);font-size:.95em;}
+
+  input[type="text"],input[type="date"],input[type="number"],textarea{
+    width:100%;border:1px solid var(--border);background:var(--bg);color:var(--fg);
+    border-radius:12px;padding:12px;font-size:1em;outline:none;
+  }
+  textarea{min-height:160px;resize:vertical;}
+
+  .inline-2{display:grid;gap:10px;grid-template-columns:1fr 1fr;}
+  .inline-3{display:grid;gap:10px;grid-template-columns:1fr 1fr 1fr;}
+
+  .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;}
+  .btn{appearance:none;border:1px solid var(--primary);background:var(--primary);color:var(--primary-fg);border-radius:12px;padding:10px 14px;font-weight:700;cursor:pointer;transition:transform .06s ease, opacity .2s ease;}
+  .btn:active{transform:translateY(1px);}
+  .btn.secondary{background:transparent;color:var(--primary);border:1px solid var(--border);}
+
+  .output{background:var(--bg);border:1px dashed var(--border);border-radius:12px;padding:14px;font-family:var(--mono);white-space:pre-wrap;word-break:break-word;min-height:220px;}
+
+  .out-toolbar{display:flex;justify-content:flex-end;gap:10px;margin-bottom:8px;padding-right:6px;}
+  .toast{position:fixed;inset-inline:0;bottom:18px;margin:0 auto;width:fit-content;max-width:92%;
+    background:rgba(22,163,74,.1);color:var(--success);border:1px solid rgba(22,163,74,.5);
+    border-radius:999px;padding:10px 14px;font-weight:700;box-shadow:var(--shadow);backdrop-filter:blur(8px);
+    opacity:0;transform:translateY(8px);pointer-events:none;transition:all .25s ease;}
+  .toast.show{opacity:1;transform:translateY(0);}
+  .muted{color:var(--muted);font-size:.92em;}
+  .badge{display:inline-flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--border);color:var(--muted);border-radius:999px;padding:6px 10px;font-size:.9em;}
+</style>
+</head>
+<body>
+  <div class="container">
+    <section class="header">
+      <h1 class="title">🧩 Gerador de Lista - GC</h1>
+      <p class="subtitle">
+        💻 <b>No computador:</b> clique com o botão direito, selecione as mensagens dos nomes (incluindo visitantes) e pressione <b>Ctrl + C</b> para copiar.<br>
+        🍎 <b>No iPhone:</b> segure uma mensagem → <b>Encaminhar</b> → selecione todas → toque no ícone de compartilhar → <b>Copiar</b>.<br>
+        🤖 <b>No Android:</b> segure uma mensagem → <b>Encaminhar</b> → selecione todas → toque nos <b>três pontinhos › Copiar</b>.<br><br>
+        Depois é só colar tudo no campo abaixo e clicar em <b>Gerar Lista</b> para criar a mensagem formatada. ✅
+      </p>
+    </section>
+
+    <!-- 1) CABEÇALHO -->
+    <section class="card" style="margin-bottom:16px;">
+      <h2>Cabeçalho</h2>
+      <div class="row inline-2">
+        <div>
+          <label for="meetingDate">Data do GC</label>
+          <input id="meetingDate" type="date" />
+        </div>
+        <div>
+          <label for="valor">Valor</label>
+          <input id="valor" type="text" value="R$ 25,00" />
+        </div>
+      </div>
+      <div class="row">
+        <label for="endereco">Endereço</label>
+        <input id="endereco" type="text" value="Rua Ribeirão Bonito, 638, Jardim do Trevo" />
+      </div>
+      <div class="row">
+        <label for="horario">Horário</label>
+        <input id="horario" type="text" value="Recepção 19h30 - ❗expectativa oficial de início 20:10" />
+      </div>
+      <div class="row inline-2">
+        <div>
+          <label for="pix">PIX</label>
+          <input id="pix" type="text" value="decomunhaogrupo@gmail.com" />
+        </div>
+        <div>
+          <label for="comida">Comida</label>
+          <input id="comida" type="text" value="A DEFINIR" />
+        </div>
+      </div>
+    </section>
+
+    <div class="grid">
+      <!-- 2) ENTRADA -->
+      <section class="card">
+        <h2>Entrada</h2>
+        <div class="row">
+          <label for="input">Mensagens do WhatsApp</label>
+          <textarea id="input" placeholder="[06/10/2025 21:00] +55 ...: Nome ..."></textarea>
+          <div class="badge">Dica: pode colar tudo em uma única linha ou várias.</div>
+        </div>
+      </section>
+
+      <!-- 3) CONFIGURAÇÕES -->
+      <section class="card">
+        <h2>Configurações</h2>
+        <div class="row">
+          <label for="limit">Limite de vagas (Frequentes)</label>
+          <input id="limit" type="number" value="30" min="1" />
+        </div>
+        <div class="row">
+          <label for="aniversarios">(Opcional) Aniversários do mês — um por linha</label>
+          <textarea id="aniversarios" placeholder="Ex.: Maria (10/10)
+Pedro (28/10)"></textarea>
+        </div>
+        <div class="actions">
+          <button class="btn" id="btn">Gerar Lista</button>
+        </div>
+      </section>
+    </div>
+
+    <!-- 4) MENSAGEM -->
+    <section class="card" style="margin-top:16px;">
+      <h2>Mensagem formatada</h2>
+      <div class="out-toolbar">
+        <button class="btn secondary" id="copy">Copiar</button>
+      </div>
+      <div id="output" class="output"></div>
+      <p class="muted" style="margin-top:10px">Toque e segure para copiar, ou use o botão “Copiar”.</p>
+    </section>
+  </div>
+
+  <div class="toast" id="toast">✅ Copiado!</div>
+
+<script>
+(function(){
+  // ---------- utils ----------
+  const connectors = new Set(['de','da','do','dos','das','e','della','del']);
+
+  function toTitleCase(s) {
+    return s.split(/\s+/).map(word => {
+      if (!word) return '';
+      const low = word.toLowerCase();
+      if (connectors.has(low)) return low;
+      return low.charAt(0).toUpperCase() + low.slice(1);
+    }).join(' ').replace(/\s+/g,' ').trim();
+  }
+
+  // Quebra sempre por timestamps do WhatsApp:
+  // [dd/mm/aaaa hh:mm]  OU  [d/m/aa, hh:mm:ss]
+  function splitRecords(raw){
+    const PATTERN = /(?=\[\d{1,2}\/\d{1,2}\/(?:\d{2}|\d{4})(?:,\s+|\s+)\d{1,2}:\d{2}(?::\d{2})?\])/g;
+    return raw.split(PATTERN).map(s => s.trim()).filter(Boolean);
+  }
+
+  // Remove caracteres invisíveis (LTR/RTL marks, NBSP etc.)
+  function stripZws(s){
+    return s.replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069]/g, '').replace(/\u00A0/g, ' ');
+  }
+
+  // Remove artefatos do WhatsApp iOS "<Mensagem editada>", "<Mídia omitida>", etc.
+  function stripWaArtifacts(s){
+    let t = stripZws(s);
+    t = t.replace(/<\s*Mensagem\s+editada\s*>/gi, '');
+    t = t.replace(/<\s*Mensagem\s+exclu[ií]da\s*>/gi, '');
+    t = t.replace(/<\s*M[íi]dia\s+omitida\s*>/gi, '');
+    t = t.replace(/<\s*Mensagem\s+apagada\s*>/gi, '');
+    return t;
+  }
+
+  function extractSender(line){
+    const m = line.match(/\]\s*([^:\]]+):/);
+    return m ? stripWaArtifacts(m[1].trim()) : '';
+  }
+
+  function afterLastColon(line){
+    const idx = line.lastIndexOf(':');
+    return idx === -1 ? stripWaArtifacts(line.trim()) : stripWaArtifacts(line.slice(idx+1).trim());
+  }
+
+  // separa múltiplos nomes por vírgula, "/", "&", " e "
+  function splitMultiNames(raw){
+    return raw.replace(/\s+/g,' ')
+      .split(/\s*,\s*|\s+\/\s+|\s+&\s+|\s+e\s+/i)
+      .map(s => toTitleCase(s.trim()))
+      .filter(Boolean);
+  }
+
+  function normalizeKey(name){
+    const s = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    return s.replace(/\s+/g,' ').trim();
+  }
+
+  function nextFridayISO(){
+    const now = new Date();
+    const dt = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const FRIDAY = 5; // 0=Dom
+    let add = (FRIDAY - dt.getDay() + 7) % 7; if (add === 0) add = 7;
+    dt.setDate(dt.getDate() + add);
+    const yyyy = dt.getFullYear(), mm = String(dt.getMonth()+1).padStart(2,'0'), dd = String(dt.getDate()).padStart(2,'0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  function formatBRDate(iso){
+    const [y,m,d] = iso.split('-').map(n=>parseInt(n,10));
+    return `${String(d).padStart(2,'0')}/${String(m).padStart(2,'0')}`;
+  }
+
+  function weekdayPT(iso){
+    const [y,m,d] = iso.split('-').map(n=>parseInt(n,10));
+    const dt = new Date(y, m-1, d);
+    const names = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
+    return names[dt.getDay()];
+  }
+
+  // -------- VISITANTES: detecção/limpeza ----------
+  function isVisitorPayload(text){
+    return /\bvisitante\b/i.test(text);
+  }
+  // remove "visitante" + separadores (hífen, parênteses, dois-pontos, espaços)
+  function cleanVisitorPayload(text){
+    let t = text;
+    t = t.replace(/\(\s*visitantes?\s*\)/gi, '');
+    t = t.replace(/[:\-–—]\s*visitantes?/gi, '');
+    t = t.replace(/\s*\bvisitantes?\b\s*$/i, '');
+    t = t.replace(/[\s\-–—:]+$/g, '');
+    return t.replace(/\s+/g,' ').trim();
+  }
+
+  // ---------- main ----------
+  function gerar() {
+    const raw = (document.getElementById('input').value || '').trim();
+    const limit = Math.max(1, parseInt(document.getElementById('limit').value||'30',10));
+    const meetingDateISO = document.getElementById('meetingDate').value || nextFridayISO();
+
+    const endereco = document.getElementById('endereco').value || '';
+    const horario  = document.getElementById('horario').value || '';
+    const pix      = document.getElementById('pix').value || '';
+    const valor    = document.getElementById('valor').value || '';
+    const comida   = document.getElementById('comida').value || '';
+    const aniversRaw = document.getElementById('aniversarios').value || '';
+
+    // --- processa mensagens (lista principal + visitantes) ---
+    const records = splitRecords(raw);
+    const seen = new Set();            // dedupe por nome
+    const naoVisitantes = [];
+    const visitantesArr = [];          // já "Nome (Remetente)"
+
+    for (const rec of records){
+      const sender = extractSender(rec) || '';
+      const msgRaw = afterLastColon(rec);
+      if (!msgRaw) continue;
+
+      const visitor = isVisitorPayload(msgRaw);
+      let content = visitor ? cleanVisitorPayload(msgRaw) : msgRaw;
+
+      // 1) limpa artefatos do WA iOS
+      content = stripWaArtifacts(content);
+
+      // 2) se vier com quebras internas, trata cada linha como separador de múltiplos nomes
+      content = content.replace(/\r?\n+/g, ', ');
+
+      const names = splitMultiNames(content);
+      for (const n of names){
+        const name = toTitleCase(n);
+        const key = normalizeKey(name);
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        if (visitor){
+          visitantesArr.push(`${name} (${sender})`);
+        } else {
+          naoVisitantes.push(name);
+        }
+      }
+    }
+
+    // --- frequentes/espera ---
+    const lista  = naoVisitantes.slice(0, limit);
+    const espera = naoVisitantes.slice(limit);
+
+    // --- saída ---
+    const diaFmt = `${formatBRDate(meetingDateISO)} - ${weekdayPT(meetingDateISO)}`;
+    let out = '';
+    out += `LISTA OFICIAL\n\n`;
+    out += `📍Endereço: ${endereco}\n`;
+    out += `🗓 DIA: ${diaFmt}\n`;
+    out += `⏰ HORÁRIO: ${horario}\n`;
+    out += `💰PIX: ${pix}\n`;
+    out += `🔺 ${valor}\n\n`;
+    out += `🍔 COMIDA: ${comida}\n\n`;
+
+    // FREQUENTES
+    out += `FREQUENTES\n`;
+    if (lista.length) { lista.forEach((n,i)=> out += `${i+1}. ${n}\n`); }
+    else { out += `—\n`; }
+    out += `*⚠ LIMITE ⚠*\n\n`;
+
+    // ESPERA
+    out += `ESPERA\n`;
+    if (espera.length) { espera.forEach((n,i)=> out += `${i+1}. ${n}\n`); }
+    else { out += `—\n`; }
+    out += `\n`;
+
+    // VISITANTES
+    out += `VISITANTES\n`;
+    if (visitantesArr.length) { visitantesArr.forEach((v,i)=> out += `${i+1}. ${v}\n`); }
+    else { out += `—\n`; }
+    out += `*⚠ LIMITE ⚠*\n\n`;
+
+    // ANIVERSÁRIOS DO MÊS
+    out += `ANIVERSÁRIOS DO MÊS\n`;
+    if (aniversRaw.trim()) {
+      const linhas = aniversRaw.split(/\n+/).map(s=>s.trim()).filter(Boolean);
+      linhas.forEach((l,i)=> out += `${i+1}. ${l}\n`);
+    } else {
+      out += `—\n`;
+    }
+
+    document.getElementById('output').textContent = out.trim();
+  }
+
+  function copyOut(){
+    const txt = document.getElementById('output').textContent || '';
+    if (!txt) return;
+    if (!navigator.clipboard) {
+      const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta);
+      ta.select(); document.execCommand('copy'); document.body.removeChild(ta); showToast(); return;
+    }
+    navigator.clipboard.writeText(txt).then(showToast);
+  }
+  function showToast(){ const t=document.getElementById('toast'); t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1500); }
+
+  // defaults
+  document.getElementById('meetingDate').value = nextFridayISO();
+  document.getElementById('btn').addEventListener('click', gerar);
+  document.getElementById('copy').addEventListener('click', copyOut);
+})();
+</script>
+</body>
+</html>
