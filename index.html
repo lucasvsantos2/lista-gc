@@ -72,7 +72,7 @@
     <section class="header">
       <h1 class="title">🧩 Gerador de Lista - GC</h1>
       <p class="subtitle">
-        💻 <b>No computador:</b> clique com o botão direito, selecione as mensagens dos nomes (incluindo visitantes) e pressione <b>Ctrl + C</b> para copiar.<br>
+        💻 <b>No computador:</b> clique com o botão direito, selecione as mensagens dos nomes (incluindo visitantes) e pressione <b>Ctrl + C</b> ou clique no ícone de copiar para copiar.<br>
         🍎 <b>No iPhone:</b> segure uma mensagem → <b>Encaminhar</b> → selecione todas → toque no ícone de compartilhar → <b>Copiar</b>.<br>
         🤖 <b>No Android:</b> segure uma mensagem → <b>Encaminhar</b> → selecione todas → toque nos <b>três pontinhos › Copiar</b>.<br><br>
         Depois é só colar tudo no campo abaixo e clicar em <b>Gerar Lista</b> para criar a mensagem formatada. ✅
@@ -208,6 +208,47 @@ Pedro (28/10)"></textarea>
       .filter(Boolean);
   }
 
+  function isOldWhatsAppDump(raw){
+    // Heurística: modo antigo costuma ter algo como "[dd/mm/aaaa hh:mm] ...: msg"
+    return /\[\d{1,2}\/\d{1,2}\/(?:\d{2}|\d{4})/.test(raw) && /:\s*/.test(raw);
+  }
+
+  function splitLinesSmart(raw){
+    // Aceita linhas, e também cola tudo em uma linha com separações por vírgula
+    // mas prioriza quebra de linha (novo formato)
+    const normalized = stripWaArtifacts(raw)
+      .replace(/\r/g, '')
+      .replace(/\t/g, ' ')
+      .trim();
+
+    if (!normalized) return [];
+
+    // Se tiver várias linhas, usa linhas.
+    if (normalized.includes('\n')) {
+      return normalized.split('\n').map(s => s.trim()).filter(Boolean);
+    }
+
+    // Se colaram tudo numa linha só, tenta separar por vírgula/;.
+    return normalized.split(/\s*,\s*|\s*;\s*/).map(s => s.trim()).filter(Boolean);
+  }
+
+  function cleanNameLine(line){
+    // remove marcadores comuns
+    let t = line.trim();
+
+    // remove numeração tipo "1. Nome" ou "- Nome"
+    t = t.replace(/^\s*[-•]\s*/g, '');
+    t = t.replace(/^\s*\d+\s*[.)-]\s*/g, '');
+
+    // remove “(visitante)” ou “- visitante” etc do texto (a detecção é feita antes)
+    t = cleanVisitorPayload(t);
+
+    // normaliza espaços
+    t = t.replace(/\s+/g, ' ').trim();
+    return t;
+  }
+
+
   function normalizeKey(name){
     const s = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
     return s.replace(/\s+/g,' ').trim();
@@ -262,40 +303,67 @@ Pedro (28/10)"></textarea>
     const comida   = document.getElementById('comida').value || '';
     const aniversRaw = document.getElementById('aniversarios').value || '';
 
-    // --- processa mensagens (lista principal + visitantes) ---
-    const records = splitRecords(raw);
-    const seen = new Set();            // dedupe por nome
+    // --- processa entrada (modo antigo e modo novo) ---
+    const seen = new Set();
     const naoVisitantes = [];
-    const visitantesArr = [];          // já "Nome (Remetente)"
+    const visitantesArr = [];
 
-    for (const rec of records){
-      const sender = extractSender(rec) || '';
-      const msgRaw = afterLastColon(rec);
-      if (!msgRaw) continue;
-
-      const visitor = isVisitorPayload(msgRaw);
-      let content = visitor ? cleanVisitorPayload(msgRaw) : msgRaw;
-
-      // 1) limpa artefatos do WA iOS
-      content = stripWaArtifacts(content);
-
-      // 2) se vier com quebras internas, trata cada linha como separador de múltiplos nomes
-      content = content.replace(/\r?\n+/g, ', ');
-
-      const names = splitMultiNames(content);
-      for (const n of names){
-        const name = toTitleCase(n);
-        const key = normalizeKey(name);
-        if (seen.has(key)) continue;
-        seen.add(key);
-
-        if (visitor){
-          visitantesArr.push(`${name} (${sender})`);
-        } else {
-          naoVisitantes.push(name);
+    if (isOldWhatsAppDump(raw)) {
+      // ===== MODO ANTIGO (WhatsApp dump completo) =====
+      const records = splitRecords(raw);
+    
+      for (const rec of records){
+        const sender = extractSender(rec) || '';
+        const msgRaw = afterLastColon(rec);
+        if (!msgRaw) continue;
+      
+        const visitor = isVisitorPayload(msgRaw);
+        let content = visitor ? cleanVisitorPayload(msgRaw) : msgRaw;
+      
+        content = stripWaArtifacts(content);
+        content = content.replace(/\r?\n+/g, ', ');
+      
+        const names = splitMultiNames(content);
+        for (const n of names){
+          const name = toTitleCase(n.trim());
+          if (!name) continue;
+        
+          const key = normalizeKey(name);
+          if (seen.has(key)) continue;
+          seen.add(key);
+        
+          if (visitor) visitantesArr.push(`${name} (${sender})`);
+          else naoVisitantes.push(name);
+        }
+      }
+    
+    } else {
+      // ===== MODO NOVO (só nomes por linha) =====
+      const lines = splitLinesSmart(raw);
+    
+      for (const line of lines){
+        if (!line) continue;
+      
+        const visitor = isVisitorPayload(line);
+        const cleaned = cleanNameLine(line);
+      
+        // permite múltiplos nomes na mesma linha (se vier separado por vírgula, /, & ou " e ")
+        const names = splitMultiNames(cleaned);
+      
+        for (const n of names){
+          const name = toTitleCase(n.trim());
+          if (!name) continue;
+        
+          const key = normalizeKey(name);
+          if (seen.has(key)) continue;
+          seen.add(key);
+        
+          if (visitor) visitantesArr.push(name); // sem remetente agora
+          else naoVisitantes.push(name);
         }
       }
     }
+
 
     // --- frequentes/espera ---
     const lista  = naoVisitantes.slice(0, limit);
