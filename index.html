@@ -110,6 +110,19 @@
           <input id="comida" type="text" value="A DEFINIR" />
         </div>
       </div>
+      <div class="row">
+        <label for="equipe">Equipe</label>
+        <textarea id="equipe" style="min-height: 120px;">Letícia Anastácio
+Jordanna Morgado
+Lucas Santos
+Eduardo Sardinha
+Gabrielle de Moraes
+Mariane Gonçalves
+Ervellyn Barbosa
+Patrick Conti
+Giovanna Mantovani
+Guilherme Valério</textarea>
+      </div>
     </section>
 
     <div class="grid">
@@ -118,7 +131,7 @@
         <h2>Entrada</h2>
         <div class="row">
           <label for="input">Mensagens do WhatsApp</label>
-          <textarea id="input" placeholder="[06/10/2025 21:00] +55 ...: Nome ..."></textarea>
+          <textarea id="input" placeholder="Cole aqui as mensagens copiadas do WhatsApp..."></textarea>
           <div class="badge">Dica: pode colar tudo em uma única linha ou várias.</div>
         </div>
       </section>
@@ -131,8 +144,12 @@
           <input id="limit" type="number" value="30" min="1" />
         </div>
         <div class="row">
+          <label for="kids">GC DO LAGO KIDS 🥳 — um por linha</label>
+          <textarea id="kids" style="min-height: 90px;" placeholder="Ex.: Theo Loureiro (Laura)"></textarea>
+        </div>
+        <div class="row">
           <label for="aniversarios">(Opcional) Aniversários do mês — um por linha</label>
-          <textarea id="aniversarios" placeholder="Ex.: Maria (10/10)
+          <textarea id="aniversarios" style="min-height: 90px;" placeholder="Ex.: Maria (10/10)
 Pedro (28/10)"></textarea>
         </div>
         <div class="actions">
@@ -168,13 +185,6 @@ Pedro (28/10)"></textarea>
     }).join(' ').replace(/\s+/g,' ').trim();
   }
 
-  // Quebra sempre por timestamps do WhatsApp:
-  // [dd/mm/aaaa hh:mm]  OU  [d/m/aa, hh:mm:ss]
-  function splitRecords(raw){
-    const PATTERN = /(?=\[\d{1,2}\/\d{1,2}\/(?:\d{2}|\d{4})(?:,\s+|\s+)\d{1,2}:\d{2}(?::\d{2})?\])/g;
-    return raw.split(PATTERN).map(s => s.trim()).filter(Boolean);
-  }
-
   // Remove caracteres invisíveis (LTR/RTL marks, NBSP etc.)
   function stripZws(s){
     return s.replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069]/g, '').replace(/\u00A0/g, ' ');
@@ -190,17 +200,7 @@ Pedro (28/10)"></textarea>
     return t;
   }
 
-  function extractSender(line){
-    const m = line.match(/\]\s*([^:\]]+):/);
-    return m ? stripWaArtifacts(m[1].trim()) : '';
-  }
-
-  function afterLastColon(line){
-    const idx = line.lastIndexOf(':');
-    return idx === -1 ? stripWaArtifacts(line.trim()) : stripWaArtifacts(line.slice(idx+1).trim());
-  }
-
-  // separa múltiplos nomes por vírgula, "/", "&", " e "
+  // Separa múltiplos nomes se houver vírgula, "/", "&" ou " e " na mesma linha
   function splitMultiNames(raw){
     return raw.replace(/\s+/g,' ')
       .split(/\s*,\s*|\s+\/\s+|\s+&\s+|\s+e\s+/i)
@@ -208,46 +208,14 @@ Pedro (28/10)"></textarea>
       .filter(Boolean);
   }
 
-  function isOldWhatsAppDump(raw){
-    // Heurística: modo antigo costuma ter algo como "[dd/mm/aaaa hh:mm] ...: msg"
-    return /\[\d{1,2}\/\d{1,2}\/(?:\d{2}|\d{4})/.test(raw) && /:\s*/.test(raw);
-  }
-
-  function splitLinesSmart(raw){
-    // Aceita linhas, e também cola tudo em uma linha com separações por vírgula
-    // mas prioriza quebra de linha (novo formato)
-    const normalized = stripWaArtifacts(raw)
-      .replace(/\r/g, '')
-      .replace(/\t/g, ' ')
-      .trim();
-
-    if (!normalized) return [];
-
-    // Se tiver várias linhas, usa linhas.
-    if (normalized.includes('\n')) {
-      return normalized.split('\n').map(s => s.trim()).filter(Boolean);
-    }
-
-    // Se colaram tudo numa linha só, tenta separar por vírgula/;.
-    return normalized.split(/\s*,\s*|\s*;\s*/).map(s => s.trim()).filter(Boolean);
-  }
-
   function cleanNameLine(line){
-    // remove marcadores comuns
     let t = line.trim();
-
-    // remove numeração tipo "1. Nome" ou "- Nome"
     t = t.replace(/^\s*[-•]\s*/g, '');
     t = t.replace(/^\s*\d+\s*[.)-]\s*/g, '');
-
-    // remove “(visitante)” ou “- visitante” etc do texto (a detecção é feita antes)
     t = cleanVisitorPayload(t);
-
-    // normaliza espaços
     t = t.replace(/\s+/g, ' ').trim();
     return t;
   }
-
 
   function normalizeKey(name){
     const s = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -280,7 +248,6 @@ Pedro (28/10)"></textarea>
   function isVisitorPayload(text){
     return /\bvisitante\b/i.test(text);
   }
-  // remove "visitante" + separadores (hífen, parênteses, dois-pontos, espaços)
   function cleanVisitorPayload(text){
     let t = text;
     t = t.replace(/\(\s*visitantes?\s*\)/gi, '');
@@ -290,80 +257,120 @@ Pedro (28/10)"></textarea>
     return t.replace(/\s+/g,' ').trim();
   }
 
+  // Renderiza uma lista numerada ou o padrão de 1 a 5 para preenchimento
+  function renderNumberedList(items, emptyCount = 5) {
+    if (items && items.length > 0) {
+      return items.map((item, i) => `${i + 1}. ${item}`).join('\n') + '\n';
+    }
+    let fallback = '';
+    for (let i = 1; i <= emptyCount; i++) {
+      fallback += `${i}.\n`;
+    }
+    return fallback;
+  }
+
+  // Novo extrator robusto para mensagens do WhatsApp
+  function parseWhatsAppDump(rawText) {
+    const cleaned = stripWaArtifacts(rawText);
+    
+    // Regex universal para encontrar o cabeçalho de mensagem do WhatsApp:
+    // Ex: [21:00, 06/07/2026] +55 ...:   OU   [06/07/2026 21:00] Nome:
+    const headerRegex = /\[\s*(?:\d{1,2}:\d{2}(?::\d{2})?,\s*\d{1,2}\/\d{1,2}\/\d{2,4}|\d{1,2}\/\d{1,2}\/\d{2,4}(?:,\s*|\s+)\d{1,2}:\d{2}(?::\d{2})?)\s*\]\s*[^:\n\r]+:\s*/gi;
+
+    // Se possui headers do WhatsApp, divide pelas ocorrências desses headers
+    const matches = [...cleaned.matchAll(headerRegex)];
+    
+    if (matches.length > 0) {
+      const records = [];
+      for (let i = 0; i < matches.length; i++) {
+        const currentMatch = matches[i];
+        const startIndex = currentMatch.index + currentMatch[0].length;
+        const endIndex = (i + 1 < matches.length) ? matches[i + 1].index : cleaned.length;
+        
+        // Extrai o remetente (para o caso de visitantes) e a mensagem pura
+        const headerText = currentMatch[0];
+        const senderMatch = headerText.match(/\]\s*([^:\]]+):/);
+        const sender = senderMatch ? senderMatch[1].trim() : '';
+        const msgText = cleaned.substring(startIndex, endIndex).trim();
+
+        if (msgText) {
+          records.push({ sender, text: msgText });
+        }
+      }
+      return { isDump: true, records };
+    }
+
+    return { isDump: false, records: [] };
+  }
+
   // ---------- main ----------
   function gerar() {
     const raw = (document.getElementById('input').value || '').trim();
     const limit = Math.max(1, parseInt(document.getElementById('limit').value||'30',10));
     const meetingDateISO = document.getElementById('meetingDate').value || nextFridayISO();
 
-    const endereco = document.getElementById('endereco').value || '';
-    const horario  = document.getElementById('horario').value || '';
-    const pix      = document.getElementById('pix').value || '';
-    const valor    = document.getElementById('valor').value || '';
-    const comida   = document.getElementById('comida').value || '';
+    const endereco   = document.getElementById('endereco').value || '';
+    const horario    = document.getElementById('horario').value || '';
+    const pix        = document.getElementById('pix').value || '';
+    const valor      = document.getElementById('valor').value || '';
+    const comida     = document.getElementById('comida').value || '';
+    const equipeRaw  = document.getElementById('equipe').value || '';
+    const kidsRaw    = document.getElementById('kids').value || '';
     const aniversRaw = document.getElementById('aniversarios').value || '';
 
-    // --- processa entrada (modo antigo e modo novo) ---
     const seen = new Set();
     const naoVisitantes = [];
     const visitantesArr = [];
 
-    if (isOldWhatsAppDump(raw)) {
-      // ===== MODO ANTIGO (WhatsApp dump completo) =====
-      const records = splitRecords(raw);
-    
-      for (const rec of records){
-        const sender = extractSender(rec) || '';
-        const msgRaw = afterLastColon(rec);
-        if (!msgRaw) continue;
-      
-        const visitor = isVisitorPayload(msgRaw);
-        let content = visitor ? cleanVisitorPayload(msgRaw) : msgRaw;
-      
-        content = stripWaArtifacts(content);
-        content = content.replace(/\r?\n+/g, ', ');
-      
-        const names = splitMultiNames(content);
-        for (const n of names){
-          const name = toTitleCase(n.trim());
-          if (!name) continue;
-        
-          const key = normalizeKey(name);
-          if (seen.has(key)) continue;
-          seen.add(key);
-        
-          if (visitor) visitantesArr.push(`${name} (${sender})`);
-          else naoVisitantes.push(name);
+    const parsedDump = parseWhatsAppDump(raw);
+
+    if (parsedDump.isDump) {
+      // ===== PROCESSA DUMP DO WHATSAPP =====
+      for (const rec of parsedDump.records) {
+        const visitor = isVisitorPayload(rec.text);
+        let content = visitor ? cleanVisitorPayload(rec.text) : rec.text;
+
+        // Se houver várias linhas na mesma mensagem
+        const lines = content.split(/\r?\n+/).map(s => s.trim()).filter(Boolean);
+
+        for (const line of lines) {
+          const names = splitMultiNames(line);
+          for (const n of names) {
+            const name = toTitleCase(cleanNameLine(n));
+            if (!name) continue;
+
+            const key = normalizeKey(name);
+            if (seen.has(key)) continue;
+            seen.add(key);
+
+            if (visitor) visitantesArr.push(`${name} (${rec.sender})`);
+            else naoVisitantes.push(name);
+          }
         }
       }
-    
     } else {
-      // ===== MODO NOVO (só nomes por linha) =====
-      const lines = splitLinesSmart(raw);
-    
-      for (const line of lines){
-        if (!line) continue;
-      
+      // ===== PROCESSA DIGITAÇÃO DIRETA / LINHAS SIMPLES =====
+      const lines = raw.split(/\r?\n+/).map(s => s.trim()).filter(Boolean);
+
+      for (const line of lines) {
         const visitor = isVisitorPayload(line);
         const cleaned = cleanNameLine(line);
-      
-        // permite múltiplos nomes na mesma linha (se vier separado por vírgula, /, & ou " e ")
+
         const names = splitMultiNames(cleaned);
-      
-        for (const n of names){
+
+        for (const n of names) {
           const name = toTitleCase(n.trim());
           if (!name) continue;
-        
+
           const key = normalizeKey(name);
           if (seen.has(key)) continue;
           seen.add(key);
-        
-          if (visitor) visitantesArr.push(name); // sem remetente agora
+
+          if (visitor) visitantesArr.push(name);
           else naoVisitantes.push(name);
         }
       }
     }
-
 
     // --- frequentes/espera ---
     const lista  = naoVisitantes.slice(0, limit);
@@ -372,40 +379,45 @@ Pedro (28/10)"></textarea>
     // --- saída ---
     const diaFmt = `${formatBRDate(meetingDateISO)} - ${weekdayPT(meetingDateISO)}`;
     let out = '';
-    out += `LISTA OFICIAL\n\n`;
-    out += `📍Endereço: ${endereco}\n`;
-    out += `🗓 DIA: ${diaFmt}\n`;
-    out += `⏰ HORÁRIO: ${horario}\n`;
-    out += `💰PIX: ${pix}\n`;
+    
+    // CABEÇALHO
+    out += `*LISTA OFICIAL*\n\n`;
+    out += `📍 *ENDEREÇO:* ${endereco}\n`;
+    out += `🗓️ *DIA:* ${diaFmt}\n`;
+    out += `⏰ *HORÁRIO:* ${horario}\n`;
+    out += `💰 *PIX:* ${pix}\n`;
     out += `🔺 ${valor}\n\n`;
-    out += `🍔 COMIDA: ${comida}\n\n`;
+    out += `🍔 *COMIDA:* ${comida}\n\n`;
 
-    // FREQUENTES
-    out += `FREQUENTES\n`;
-    if (lista.length) { lista.forEach((n,i)=> out += `${i+1}. ${n}\n`); }
-    else { out += `—\n`; }
-    out += `*⚠ LIMITE ⚠*\n\n`;
+    // 1. EQUIPE
+    out += `*EQUIPE*\n`;
+    out += `(Estamos aqui por você - Nos chame)\n`;
+    const equipeLinhas = equipeRaw.split(/\r?\n+/).map(s => s.replace(/^\d+\.\s*/, '').trim()).filter(Boolean);
+    out += renderNumberedList(equipeLinhas, 5) + `\n`;
 
-    // ESPERA
-    out += `ESPERA\n`;
-    if (espera.length) { espera.forEach((n,i)=> out += `${i+1}. ${n}\n`); }
-    else { out += `—\n`; }
-    out += `\n`;
+    // 2. FREQUENTES
+    out += `*FREQUENTES*\n`;
+    out += renderNumberedList(lista, 5);
+    out += `*⚠️ LIMITE ⚠️*\n\n`;
 
-    // VISITANTES
-    out += `VISITANTES\n`;
-    if (visitantesArr.length) { visitantesArr.forEach((v,i)=> out += `${i+1}. ${v}\n`); }
-    else { out += `—\n`; }
-    out += `*⚠ LIMITE ⚠*\n\n`;
+    // 3. VISITANTES
+    out += `*VISITANTES*\n`;
+    out += renderNumberedList(visitantesArr, 5);
+    out += `*⚠️ LIMITE ⚠️*\n\n`;
 
-    // ANIVERSÁRIOS DO MÊS
-    out += `ANIVERSÁRIOS DO MÊS\n`;
-    if (aniversRaw.trim()) {
-      const linhas = aniversRaw.split(/\n+/).map(s=>s.trim()).filter(Boolean);
-      linhas.forEach((l,i)=> out += `${i+1}. ${l}\n`);
-    } else {
-      out += `—\n`;
-    }
+    // 4. GC DO LAGO KIDS
+    out += `*GC DO LAGO KIDS* 🥳\n`;
+    const kidsLinhas = kidsRaw.split(/\r?\n+/).map(s => s.replace(/^\d+\.\s*/, '').trim()).filter(Boolean);
+    out += renderNumberedList(kidsLinhas, 5) + `\n`;
+
+    // 5. ESPERA
+    out += `*ESPERA*\n`;
+    out += renderNumberedList(espera, 5) + `\n`;
+
+    // 6. ANIVERSÁRIOS DO MÊS
+    out += `*ANIVERSÁRIOS DO MÊS*\n`;
+    const aniversLinhas = aniversRaw.split(/\r?\n+/).map(s => s.replace(/^\d+\.\s*/, '').trim()).filter(Boolean);
+    out += renderNumberedList(aniversLinhas, 5);
 
     document.getElementById('output').textContent = out.trim();
   }
