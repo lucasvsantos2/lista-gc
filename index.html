@@ -257,7 +257,7 @@ Pedro (28/10)"></textarea>
     return t.replace(/\s+/g,' ').trim();
   }
 
-  // Renderiza uma lista numerada ou o padrão de 1 a 5 para preenchimento
+  // Renderiza uma lista numerada padrão para preenchimento
   function renderNumberedList(items, emptyCount = 5) {
     if (items && items.length > 0) {
       return items.map((item, i) => `${i + 1}. ${item}`).join('\n') + '\n';
@@ -269,15 +269,23 @@ Pedro (28/10)"></textarea>
     return fallback;
   }
 
-  // Novo extrator robusto para mensagens do WhatsApp
+  // Renderiza a lista de Aniversariantes no padrão específico "(Nome) - DD/MM" quando vazia
+  function renderAniversariosList(items, emptyCount = 5) {
+    if (items && items.length > 0) {
+      return items.map((item, i) => `${i + 1}. ${item}`).join('\n') + '\n';
+    }
+    let fallback = '';
+    for (let i = 1; i <= emptyCount; i++) {
+      fallback += `${i}. (Nome) - DD/MM\n`;
+    }
+    return fallback;
+  }
+
+  // Extrator de mensagens do WhatsApp
   function parseWhatsAppDump(rawText) {
     const cleaned = stripWaArtifacts(rawText);
-    
-    // Regex universal para encontrar o cabeçalho de mensagem do WhatsApp:
-    // Ex: [21:00, 06/07/2026] +55 ...:   OU   [06/07/2026 21:00] Nome:
     const headerRegex = /\[\s*(?:\d{1,2}:\d{2}(?::\d{2})?,\s*\d{1,2}\/\d{1,2}\/\d{2,4}|\d{1,2}\/\d{1,2}\/\d{2,4}(?:,\s*|\s+)\d{1,2}:\d{2}(?::\d{2})?)\s*\]\s*[^:\n\r]+:\s*/gi;
 
-    // Se possui headers do WhatsApp, divide pelas ocorrências desses headers
     const matches = [...cleaned.matchAll(headerRegex)];
     
     if (matches.length > 0) {
@@ -287,7 +295,6 @@ Pedro (28/10)"></textarea>
         const startIndex = currentMatch.index + currentMatch[0].length;
         const endIndex = (i + 1 < matches.length) ? matches[i + 1].index : cleaned.length;
         
-        // Extrai o remetente (para o caso de visitantes) e a mensagem pura
         const headerText = currentMatch[0];
         const senderMatch = headerText.match(/\]\s*([^:\]]+):/);
         const sender = senderMatch ? senderMatch[1].trim() : '';
@@ -330,7 +337,6 @@ Pedro (28/10)"></textarea>
         const visitor = isVisitorPayload(rec.text);
         let content = visitor ? cleanVisitorPayload(rec.text) : rec.text;
 
-        // Se houver várias linhas na mesma mensagem
         const lines = content.split(/\r?\n+/).map(s => s.trim()).filter(Boolean);
 
         for (const line of lines) {
@@ -349,7 +355,7 @@ Pedro (28/10)"></textarea>
         }
       }
     } else {
-      // ===== PROCESSA DIGITAÇÃO DIRETA / LINHAS SIMPLES =====
+      // ===== PROCESSA DIGITAÇÃO DIRETA =====
       const lines = raw.split(/\r?\n+/).map(s => s.trim()).filter(Boolean);
 
       for (const line of lines) {
@@ -417,7 +423,7 @@ Pedro (28/10)"></textarea>
     // 6. ANIVERSÁRIOS DO MÊS
     out += `*ANIVERSÁRIOS DO MÊS*\n`;
     const aniversLinhas = aniversRaw.split(/\r?\n+/).map(s => s.replace(/^\d+\.\s*/, '').trim()).filter(Boolean);
-    out += renderNumberedList(aniversLinhas, 5);
+    out += renderAniversariosList(aniversLinhas, 5);
 
     document.getElementById('output').textContent = out.trim();
   }
